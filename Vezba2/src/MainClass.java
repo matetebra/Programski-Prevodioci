@@ -15,7 +15,7 @@ public class MainClass
     public static void main(String args[])
     {
         int[] lookup = new int[26];
-        int[] indices = {7, 13, 22, 14, 23, 16, 15, 10, 0};
+        int[] indices = {7, 13, 9, 22, 14, 23, 16, 15, 10, 0};
 
         for(int i = 0; i < 26; i++)
         {
