@@ -1,0 +1,1 @@
+read ($b in $banana) do $c = 5
