@@ -1,0 +1,290 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+
+	public int errNo = 0;
+
+    public static void main( String[] args )
+    {
+        try
+        {
+            FileReader file = new FileReader( args[0] );
+			Scanner scanner = new MPLexer( file );
+			MPParser parser = new MPParser( scanner );
+			parser.parse();
+
+			if (parser.errNo == 0)
+			{
+				System.out.println("Analiza zavrsena. U kodu nema gresaka.");
+			}
+			else
+			{
+				System.out.println("Analiza zavrsena. Broj gresaka: " + parser.errNo);
+			}
+        }
+        catch( Exception e )
+        {
+            e.printStackTrace();
+        }
+    }
+
+    public void syntax_error(Symbol current_token)
+    {
+
+    }
+
+    public void report_error(String message, Object info)
+    {
+        System.out.println( message );
+    }
+
+    public int getLine()
+    {
+        return ( ( MPLexer ) getScanner() ).getLine();
+    }
+:};
+
+//Terminali
+terminal PROGRAM, FILE, STRING, DO, INTEGER, CHAR, BEGIN, END, READ, IN;
+terminal ID, CONST, PLUS, MINUS, LEFTPAR, RIGHTPAR, COLON, ASSIGN, SEMI, RETURN, OPEN;
+
+//Neterminali
+non terminal Program, VarList, Var, Block, Statements, Statement, Type, Assignment;
+non terminal ReadExpression, Expression, ArithmeticExpression, PrimaryExpression;
+
+precedence nonassoc error;
+precedence left PLUS, MINUS;
+
+//Gramatika
+Program ::= PROGRAM Block RETURN
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :}
+            | PROGRAM Block error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'return').");
+            parser.errNo++;
+            :}
+            | error Block RETURN
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'program').");
+            parser.errNo++;
+            :};
+
+Block ::= BEGIN VarList Statements END
+          {:
+               System.out.println( "Redukcija po smeni 2." );
+           :}
+          | BEGIN VarList Statements error
+             {:
+                System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'end').");
+            parser.errNo++;
+             :}
+          | BEGIN error
+          {:
+         	System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Telo bloka je nekorektno");
+            parser.errNo++;
+         :};
+
+VarList ::= VarList Var
+            {:
+               System.out.println( "Redukcija po smeni 3." );
+            :}
+            | Var
+            {:
+               System.out.println( "Redukcija po smeni 4." );
+            :};
+
+Var ::=  ID COLON Type SEMI
+         {:
+               System.out.println( "Redukcija po smeni 4." );
+         :}
+         | ID COLON Type error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje ; .");
+            	parser.errNo++;
+                :}
+         | ID COLON error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Greska u tipu.");
+            	parser.errNo++;
+                :}
+         | ID error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje : .");
+            	parser.errNo++;
+                :};
+
+Type ::= INTEGER
+             {:
+                System.out.println( "Redukcija po smeni 6." );
+             :}
+           | CHAR
+             {:
+                System.out.println( "Redukcija po smeni 7." );
+             :}
+           | STRING
+             {:
+                System.out.println( "Redukcija po smeni 8." );
+             :}
+           | FILE
+             {:
+                System.out.println( "Redukcija po smeni 9." );
+             :}
+           | error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Greska u tipu.");
+            	parser.errNo++;
+                :};
+
+Statements ::= Statements SEMI Statement
+        {:
+           System.out.println( "Redukcija po smeni 10." );
+        :}
+      | Statement
+        {:
+           System.out.println( "Redukcija po smeni 11." );
+        :}
+      | Statements SEMI error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Telo bloka je nekorektno.");
+            	parser.errNo++;
+                :};
+
+Statement ::= Assignment
+         {:
+            System.out.println( "Redukcija po smeni 12." );
+         :}
+       | ReadExpression
+         {:
+            System.out.println( "Redukcija po smeni 13." );
+         :};
+
+Assignment ::= ID ASSIGN Expression
+           {:
+              System.out.println( "Redukcija po smeni 14." );
+           :}
+           | ID ASSIGN error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Telo bloka je nekorektno.");
+            	parser.errNo++;
+                :}
+           | ID error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje = .");
+            	parser.errNo++;
+                :};
+
+Expression ::= ArithmeticExpression
+           {:
+              System.out.println( "Redukcija po smeni 15." );
+           :}
+          | OPEN LEFTPAR PrimaryExpression RIGHTPAR
+           {:
+              System.out.println( "Redukcija po smeni 16." );
+           :}
+          | OPEN LEFTPAR PrimaryExpression error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje ) .");
+            	parser.errNo++;
+                :}
+          | OPEN LEFTPAR error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Telo bloka je nekorektno.");
+            	parser.errNo++;
+                :}
+          | OPEN error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje ( .");
+            	parser.errNo++;
+                :};
+
+ArithmeticExpression ::= ArithmeticExpression PLUS PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 17." );
+                    :}
+                  | ArithmeticExpression MINUS PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 18." );
+                    :}
+                  | PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 19." );
+                    :}
+                  | ArithmeticExpression PLUS error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Telo bloka je nekorektno.");
+                    parser.errNo++;
+                    :};
+
+PrimaryExpression ::= ID
+                 {:
+                    System.out.println( "Redukcija po smeni 20." );
+                 :}
+                   | CONST
+                 {:
+                     System.out.println( "Redukcija po smeni 21." );
+                 :};
+
+ReadExpression ::= READ LEFTPAR ID IN ID RIGHTPAR DO Block
+              {:
+                 System.out.println( "Redukcija po smeni 22." );
+              :}
+              | READ LEFTPAR ID IN ID RIGHTPAR DO error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Telo bloka je nekorektno.");
+                    parser.errNo++;
+                    :}
+              | READ LEFTPAR ID IN ID RIGHTPAR error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje kljucna rec 'do'.");
+                    parser.errNo++;
+                    :}
+              | READ LEFTPAR ID IN ID error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ) .");
+                    parser.errNo++;
+                    :}
+               | READ LEFTPAR ID IN error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ID .");
+                    parser.errNo++;
+                    :}
+               | READ LEFTPAR ID error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje kljucna rec 'in' .");
+                    parser.errNo++;
+                    :}
+                | READ LEFTPAR error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ID .");
+                    parser.errNo++;
+                    :}
+                | READ error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ( .");
+                    parser.errNo++;
+                    :};
