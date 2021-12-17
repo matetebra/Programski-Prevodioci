@@ -1,0 +1,151 @@
+//import sekcija
+
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+   public static void main( String[] args )
+   {
+          try
+            {
+		   FileReader file = new FileReader( args[0] );
+		   Scanner scanner = new MPLexer( file );
+		   MPParser parser = new MPParser( scanner );
+		   parser.parse();
+            }
+	  catch( Exception e )
+            {
+		   e.printStackTrace();
+            }
+   }
+:};
+
+
+//Terminali
+terminal PROGRAM, FILE, STRING, DO, INTEGER, CHAR, BEGIN, END, READ, IN;
+terminal ID, CONST, PLUS, MINUS, LEFTPAR, RIGHTPAR, COLON, ASSIGN, SEMI, RETURN, OPEN;
+
+//Neterminali
+non terminal Program, VarList, Var, Block, Statements, Statement, Type, Assignment;
+non terminal ReadExpression, Expression, ArithmeticExpression, PrimaryExpression;
+
+precedence left PLUS, MINUS;
+
+//Gramatika
+Program ::= PROGRAM Block RETURN
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :}
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :};
+
+Block ::= BEGIN VarList Statements END
+             {:
+                System.out.println( "Redukcija po smeni 2." );
+             :};
+
+VarList ::= VarList Var
+            {:
+               System.out.println( "Redukcija po smeni 3." );
+            :}
+          | Var
+            {:
+               System.out.println( "Redukcija po smeni 4." );
+            :}
+          ;
+
+Var ::=  ID COLON Type SEMI
+                {:
+                   System.out.println( "Redukcija po smeni 5." );
+                :};
+
+Type ::= INTEGER
+             {:
+                System.out.println( "Redukcija po smeni 6." );
+             :} 
+           | CHAR
+             {:
+                System.out.println( "Redukcija po smeni 7." );
+             :}
+           | STRING
+             {:
+                System.out.println( "Redukcija po smeni 8." );
+             :}
+           | FILE
+             {:
+                System.out.println( "Redukcija po smeni 9." );
+             :}
+           ;
+
+Statements ::= Statements SEMI Statement
+        {:
+           System.out.println( "Redukcija po smeni 10." );
+        :}
+      | Statement
+        {:
+           System.out.println( "Redukcija po smeni 11." );
+        :}
+      ;
+
+Statement ::= Assignment
+         {:
+            System.out.println( "Redukcija po smeni 12." );
+         :}
+       | ReadExpression
+         {:
+            System.out.println( "Redukcija po smeni 13." );
+         :}
+       ;
+
+Assignment ::= ID ASSIGN Expression
+           {:
+              System.out.println( "Redukcija po smeni 14." );
+           :};
+
+Expression ::= ArithmeticExpression
+           {:
+              System.out.println( "Redukcija po smeni 15." );
+           :}
+          | OPEN LEFTPAR PrimaryExpression RIGHTPAR
+           {:
+              System.out.println( "Redukcija po smeni 16." );
+           :}
+          ;
+
+ArithmeticExpression ::= ArithmeticExpression PLUS PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 17." );
+                    :}
+                  | ArithmeticExpression MINUS PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 18." );
+                    :}
+                  | PrimaryExpression
+                    {:
+                       System.out.println( "Redukcija po smeni 19." );
+                    :}
+                  ;
+
+PrimaryExpression ::= ID
+                 {:
+                    System.out.println( "Redukcija po smeni 20." );
+                 :}
+                   | CONST
+                 {:
+                     System.out.println( "Redukcija po smeni 21." );
+                 :}
+                   ;
+
+ReadExpression ::= READ LEFTPAR ID IN ID RIGHTPAR DO Block
+              {:
+                 System.out.println( "Redukcija po smeni 22." );
+              :};
+
+
+	
+
+
+
+
+
