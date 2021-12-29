@@ -87,7 +87,7 @@ terminal Character CHARCONST;
 non terminal Program, Var, Block, Statement, Statements, Assignment;
 non terminal Type Tip, ArithmeticExpression, ReadExpression, Expression, PrimaryExpression;
 non terminal Constant Konstanta;
-non terminal ArrayList VarList;
+non terminal VarList;
 
 precedence left PLUS, MINUS;
 
@@ -114,22 +114,13 @@ VarList ::= VarList Var
 
 Var ::=  ID:ime COLON Tip:t SEMI
                 {:
-                     Variable var = parser.symbolTable.getVar(ime);
-                     if (var == null)
-                     {
-                         System.out.println( "Greska u liniji " + parser.getLine() + ": promenljiva " + ime + " nije deklarisana.");
-                         parser.errNo++;
-                     }
+
                      if (!parser.symbolTable.addVar(ime,t))
                          {
                              System.out.println("Greska u liniji " + parser.getLine() + ": " + "Promenljiva " + ime + " je vec deklarisana." );
                              parser.errNo++;
                          }
 
-                     //if (t.tkind == Type.INTEGER)
-                     //   RESULT = parser.symbolTable.getType("integer");
-                     //if (t.tkind == Type.FILE)
-                     //  RESULT = parser.symbolTable.getType("file");
                      System.out.println( "Redukcija po smeni 5." );
                  :}
                 ;
@@ -138,7 +129,7 @@ Tip ::= INTEGER
              {:
                 RESULT = parser.symbolTable.getType( "integer" );
                 System.out.println( "Redukcija po smeni 6." );
-             :} 
+             :}
            | CHAR
              {:
                 RESULT = parser.symbolTable.getType( "char" );
@@ -188,67 +179,71 @@ Assignment ::= ID:ime ASSIGN Expression:i
               else
                     {
 		         var.last_def = parser.getLine();
-		        // if (var.type.tkind != i.tkind)
-		        // {
-		        //    System.out.println( "Greska u liniji " + parser.getLine() +	": Neslaganje tipa u naredbi dodele."+ ime );
-		      	 //   parser.errNo++;
-		        // }
-                        // else
-                        // {
-                            RESULT = var.type.tkind;
-                        // }
+                         RESULT = var.type.tkind;
                      }
                System.out.println( "Redukcija po smeni 14." );
 
-             :}         
+             :}
              ;
 
 
 Expression ::= ArithmeticExpression
            {:
-              //RESULT = i;
               System.out.println( "Redukcija po smeni 17." );
            :}
           | OPEN LEFTPAR PrimaryExpression RIGHTPAR
            {:
-              //RESULT = i;
               System.out.println( "Redukcija po smeni 18." );
            :}
           ;
 
 ArithmeticExpression ::= ArithmeticExpression:i1 PLUS PrimaryExpression:i2
                     {:
-                     if (i1.tkind != Type.INTEGER || i2.tkind != Type.INTEGER)
+
+                     if (i1.tkind != Type.INTEGER && i2.tkind != Type.INTEGER || i1.tkind != Type.CHARACTER && i2.tkind != Type.CHARACTER)
                      {
-                         System.out.println("Ggreska u liniji " + parser.getLine() + ": " + "Operator + se ne moze primeniti nad operandima tipa " + i1.name + " i " + i2.name);
+                         System.out.println("Greska u liniji " + parser.getLine() + ": " + "Operator + se ne moze primeniti nad operandima tipa " + i1.name + " i " + i2.name);
                          parser.errNo++;
                          RESULT=parser.symbolTable.getType("unknown");
                      }
                      else
                      {
-                         RESULT=parser.symbolTable.getType("integer");
+                         if (i1.tkind == Type.INTEGER)
+                            RESULT=parser.symbolTable.getType("integer");
+                         else
+                            RESULT=parser.symbolTable.getType("char");
                      }
-                     
+
                      System.out.println("Redukcija po smeni 19.");
-                     :}               
+                     :}
                   | ArithmeticExpression:i1 MINUS PrimaryExpression:i2
                     {:
                      if (i1.tkind != Type.INTEGER || i2.tkind != Type.INTEGER)
                      {
-                         System.out.println("Ggreska u liniji " + parser.getLine() + ": " + "Operator - se ne moze primeniti nad operandima tipa " + i1.name + " i " + i2.name);
+                         System.out.println("Greska u liniji " + parser.getLine() + ": " + "Operator - se ne moze primeniti nad operandima tipa " + i1.name + " i " + i2.name);
                          parser.errNo++;
                          RESULT=parser.symbolTable.getType("unknown");
                      }
                      else
                      {
                          RESULT=parser.symbolTable.getType("integer");
-                     }                       
+                     }
                      System.out.println( "Redukcija po smeni 20." );
                     :}
-                  | PrimaryExpression
-                    {:                      
-                       //RESULT = i;
-                       System.out.println( "Redukcija po smeni 21." );
+                  | PrimaryExpression:i
+                    {:
+                    if (i.tkind == Type.INTEGER )
+                        RESULT=parser.symbolTable.getType("integer");
+                    if (i.tkind == Type.CHARACTER)
+                        RESULT=parser.symbolTable.getType("char");
+                    if (i.tkind == Type.FILE)
+                        RESULT=parser.symbolTable.getType("file");
+                    if (i.tkind == Type.STRING)
+                        RESULT=parser.symbolTable.getType("string");
+                    else
+                        RESULT=parser.symbolTable.getType("unknown");
+
+                    System.out.println( "Redukcija po smeni 21." );
                     :}
                   ;
 
@@ -316,7 +311,6 @@ Konstanta ::= INTCONST:c
  ;
 
 
-	
 
 
 
