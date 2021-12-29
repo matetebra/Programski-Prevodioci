@@ -60,7 +60,7 @@ hex = [0-9a-fA-F]
 "return"                { return new Symbol( sym.RETURN );      }
 "file"                  { return new Symbol( sym.FILE );        }
 "open"                  { return new Symbol( sym.OPEN );        }
-
+"in"                    { return new Symbol( sym.IN );          }
 //identifikatori
 {slovo}({slovo}|{cifra})* { return new Symbol(sym.ID, yyline, yytext()); }
 
