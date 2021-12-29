@@ -1,0 +1,580 @@
+import java_cup.runtime.*;
+import java.io.*;
+//import java.util.*;
+import java.util.ArrayList;
+
+import SymbolTable.*;
+
+parser code {:
+
+	public int errNo = 0;
+        public int warnNo = 0;
+   
+        SymbolTable symbolTable;
+
+    public static void main( String[] args )
+    {
+        try
+        {
+            FileReader file = new FileReader( args[0] );
+			Scanner scanner = new MPLexer( file );
+			MPParser parser = new MPParser( scanner );
+			parser.parse();
+                        parser.checkWarnings();
+			if ( parser.errNo == 0 && parser.warnNo == 0 )
+                            System.out.println( "Analiza zavrsena. U kodu nema gresaka." );
+                        else
+                            System.out.println( "Analiza zavrsena. Broj gresaka: " + parser.errNo
+                            + " Broj upozorenja: " + parser.warnNo );
+        }
+        catch( Exception e )
+        {
+            e.printStackTrace();
+        }
+    }
+
+    public void checkWarnings()
+   {
+      SymbolNode current = symbolTable.getVariables();
+      while ( current != null )
+      {
+      	Variable var = ( Variable ) current;
+      	if ( var.last_def == -1 && var.last_use == -1 )
+      	{
+      		System.out.println( "Upozorenje: Promenljiva " + var.name +
+      			" je deklarisana, ali se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	else if ( var.last_def > var.last_use )
+      	{
+      		System.out.println( "Upozorenje: Vrednost dodeljena promeljivoj " +
+      		    var.name + " u liniji " + var.last_def + " se nigde ne koristi." );
+      		warnNo++;
+      	}
+      	current = current.next;
+     }
+   }
+
+    public void syntax_error(Symbol current_token)
+    {
+
+    }
+
+    public void report_error(String message, Object info)
+    {
+        System.out.println( message );
+    }
+
+    public int getLine()
+    {
+        return ( ( MPLexer ) getScanner() ).getLine();
+    }
+:};
+
+init with {:
+	symbolTable = new SymbolTable();
+:}
+
+//Terminali
+terminal PROGRAM, FILE, STRING, DO, INTEGER, CHAR, BEGIN, END, READ, IN;
+terminal PLUS, MINUS, LEFTPAR, RIGHTPAR, COLON, ASSIGN, SEMI, RETURN, OPEN;
+
+terminal String ID;
+terminal Integer INTCONST;
+terminal Character CHARCONST;
+
+//Neterminali
+non terminal Program, Var, Block, Statement, Assignment;
+non terminal Type Tip, ReadExpression, Expression, ArithmeticExpression, PrimaryExpression, Statements;
+non terminal ArrayList VarList;
+non terminal Constant Konstanta;
+
+precedence nonassoc error;
+precedence left PLUS, MINUS;
+
+//Gramatika
+Program ::= PROGRAM Block RETURN
+            {:
+               System.out.println( "Redukcija po smeni 1." );
+            :}
+            | PROGRAM Block error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'return').");
+            parser.errNo++;
+            :}
+            | error Block RETURN
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'program').");
+            parser.errNo++;
+            :};
+
+Block ::= BEGIN VarList:niz Statements:niz2 END
+          {:
+               RESULT = niz;
+           :}
+          | BEGIN VarList:niz Statements:niz2 error
+             {:
+                RESULT = niz;
+                System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Nezavrsen blok (nedostaje kljucna rec 'end').");
+            parser.errNo++;
+             :}
+          | BEGIN error
+          {:
+         	System.out.println("Greska u liniji " + parser.getLine() + ": " +
+         		"Telo bloka je nekorektno");
+            parser.errNo++;
+         :};
+
+VarList ::= VarList:niz Var:v
+            {:
+               RESULT = niz;
+               RESULT.add(v);
+            :}
+            | Var:v
+            {:
+               RESULT = new ArrayList();
+               RESULT.add(v);
+            :};
+
+Var ::=  ID:ime COLON Tip:t SEMI
+         {:
+               Variable var = parser.symbolTable.getVar(ime);
+		      if ( var == null )
+		      {
+		      	if ( ! parser.symbolTable.addVar( ime, t ) )
+					   {
+					   	 System.out.println( "Greska u liniji " + parser.getLine() + ": " +
+                   			"Promenljiva " + ime + " je vec deklarisana." );
+            		     parser.errNo++;
+					   }
+         :}
+         | ID:ime COLON error
+                {:
+                   Type t = parser.symbolTable.getType( "unknown" );
+                   Variable var = parser.symbolTable.getVar(ime);
+		      if ( var == null )
+		      {
+		      	if ( ! parser.symbolTable.addVar( ime, t ) )
+					   {
+					   	 System.out.println( "Greska u liniji " + parser.getLine() + ": " +
+                   			"Promenljiva " + ime + " je vec deklarisana." );
+            		     parser.errNo++;
+					   }
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Greska u tipu.");
+            	parser.errNo++;
+                :}
+         | ID:ime error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje : .");
+            	parser.errNo++;
+                :};
+
+Konstanta ::= INTCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "integer" ), c );
+              :}
+            | CHARCONST:c
+              {:
+                 RESULT = new Constant( parser.symbolTable.getType( "char" ), c );
+              :}
+            ;
+
+Tip ::= INTEGER
+             {:
+                RESULT = parser.symbolTable.getType( "integer" );
+             :}
+           | CHAR
+             {:
+                RESULT = parser.symbolTable.getType( "char" );
+             :}
+           | STRING
+             {:
+                RESULT = parser.symbolTable.getType( "string" );
+             :}
+           | FILE
+             {:
+                RESULT = parser.symbolTable.getType( "file" );
+             :}
+           | error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Greska u tipu.");
+            	parser.errNo++;
+                :};
+
+Statements ::= Statements:niz SEMI Statement:s
+        {:
+
+        :}
+      | Statement:s
+        {:
+
+        :}
+      | Statements:niz SEMI error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Neispravan tip");
+                        parser.errNo++;
+                :};
+
+Statement ::= Assignment:as
+         {:
+
+         :}
+       | ReadExpression:r
+         {:
+   
+         :};
+
+Assignment ::= ID:ime ASSIGN Expression:e
+           {:
+              Variable var = parser.symbolTable.getVar(ime);
+		      if (var == null)
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		      {
+		         var.last_def = parser.getLine();
+		         if ( var.type.tkind != e.tkind )
+		         {
+		            System.out.println( "Greska u liniji " + parser.getLine() +
+		      		   ": Neslaganje tipa u naredbi dodele." );
+		      	    parser.errNo++;
+		         }
+		      }
+           :}
+           | ID:ime ASSIGN error
+                {:
+                   Variable var = parser.symbolTable.getVar( ime );
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var.last_def = parser.getLine();
+              System.out.println("Greska u liniji " + parser.getLine() + ": " +
+              	"Nekorektan izraz.");
+              parser.errNo++;
+                :}
+           | ID:ime error
+                {:
+                   Variable var = parser.symbolTable.getVar( ime );
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var.last_def = parser.getLine();
+              System.out.println("Greska u liniji " + parser.getLine() + ": " +
+              	"Nedostaje ':='.");
+              parser.errNo++;
+                :};
+
+Expression ::= ArithmeticExpression:a
+           {:
+                   if (a.tkind == Type.CHARACTER)
+                       {
+                            RESULT = parser.symbolTable.getType( "char" );
+                       }
+                   if (a.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                       else
+                       {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Neispravan tip " + a.name );
+                        parser.errNo++;
+                       }
+           :}
+          | OPEN LEFTPAR PrimaryExpression:p RIGHTPAR
+           {:
+                   if (p.tkind == Type.CHARACTER)
+                       {
+                            RESULT = parser.symbolTable.getType( "char" );
+                       }
+                   if (p.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                       else
+                       {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Neispravan tip " + p.name );
+                        parser.errNo++;
+                       }
+           :}
+          | OPEN LEFTPAR PrimaryExpression:p error
+                {:
+                   if (p.tkind == Type.CHARACTER)
+                       {
+                            RESULT = parser.symbolTable.getType( "char" );
+                       }
+                   if (p.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                       else
+                       {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Neispravan tip " + p.name);
+                        parser.errNo++;
+                       }
+
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje ) .");
+            	parser.errNo++;
+                :}
+          | OPEN LEFTPAR error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Telo bloka je nekorektno.");
+            	parser.errNo++;
+                :}
+          | OPEN error
+                {:
+                   System.out.println("Greska u liniji " + parser.getLine() + ": " +
+            		"Nedostaje ( .");
+            	parser.errNo++;
+                :};
+
+ArithmeticExpression ::= ArithmeticExpression:a PLUS PrimaryExpression:p
+                    {:
+                       if ( a.tkind != Type.INTEGER || p.tkind != Type.INTEGER )
+                        {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Operator + se ne moze primeniti nad operandima tipa " +
+                           a.name + p.name);
+                        parser.errNo++;
+                        }
+                       if ( a.tkind == Type.INTEGER && p.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                       if ( a.tkind != Type.CHARACTER || p.tkind != Type.CHARACTER )
+                        {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Operator + se ne moze primeniti nad operandima tipa " +
+                           a.name + p.name );
+                        parser.errNo++;
+                        }
+                       if ( a.tkind == Type.CHARACTER && p.tkind == Type.CHARACTER)
+                       {
+                            RESULT = parser.symbolTable.getType( "char" );
+                       }
+              
+                    :}
+                  | ArithmeticExpression:a MINUS PrimaryExpression:p
+                    {:
+                       if ( a.tkind != Type.INTEGER || p.tkind != Type.INTEGER )
+                        {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Operator + se ne moze primeniti nad operandima tipa " +
+                           a.name + p.name );
+                        parser.errNo++;
+                        }
+                       if ( a.tkind == Type.INTEGER && p.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                    :}
+                  | PrimaryExpression:p
+                    {:
+                       if (p.tkind == Type.CHARACTER)
+                       {
+                            RESULT = parser.symbolTable.getType( "char" );
+                       }
+                       if (p.tkind == Type.INTEGER)
+                       {
+                            RESULT = parser.symbolTable.getType( "integer" );
+                       }
+                       else
+                       {
+                            System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                           "Neispravan tip " + p.name);
+                        parser.errNo++;
+                       }
+                    :}
+                  | ArithmeticExpression:a PLUS error
+                    {:
+                       if   ( a.tkind != Type.INTEGER )
+                             {
+                                System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                                   "Operator + se ne moze primeniti nad operandom tipa " + a.name );
+                                parser.errNo++;
+                             }
+                             System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                                "Nekorektan izraz.");
+                             parser.errNo++;
+                       RESULT = parser.symbolTable.getType( "integer" );
+                    :};
+
+PrimaryExpression ::= ID:ime
+                 {:
+		      Variable var = parser.symbolTable.getVar( ime );
+		      if ( var == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime + " nije deklarisana.");
+		      	RESULT = parser.symbolTable.getType( "unknown" );
+		      	parser.errNo++;
+		      }
+		      else
+		      {
+		      	RESULT = var.type;
+		      	if ( var.last_def == -1 )
+		      	{
+		      		System.out.println( "Greska u liniji " + parser.getLine() +
+		      			": promenljiva " + ime + " nije inicijalizovana.");
+		      		parser.errNo++;
+		      	}
+		        var.last_use = parser.getLine();
+		      }
+		   :}
+                   | Konstanta:k
+                 {:
+                     RESULT = k.type;
+                 :};
+
+ReadExpression ::= READ LEFTPAR ID:ime1 IN ID:ime2 RIGHTPAR DO Block
+              {:
+              Variable var1 = parser.symbolTable.getVar(ime1);
+              Variable var2 = parser.symbolTable.getVar(ime2);
+		      if ( var1 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime1 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var1.last_def = parser.getLine();
+                      if ( var2 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime2 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var2.last_def = parser.getLine();
+		 :}
+              | READ LEFTPAR ID:ime1 IN ID:ime2 RIGHTPAR DO error
+                    {:
+                        Variable var1 = parser.symbolTable.getVar(ime1);
+              Variable var2 = parser.symbolTable.getVar(ime2);
+		      if ( var1 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime1 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var1.last_def = parser.getLine();
+                      if ( var2 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime2 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var2.last_def = parser.getLine();
+
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Telo bloka je nekorektno.");
+                    parser.errNo++;
+                    :}
+              | READ LEFTPAR ID:ime1 IN ID:ime2 RIGHTPAR error
+                    {:
+                       Variable var1 = parser.symbolTable.getVar(ime1);
+                       Variable var2 = parser.symbolTable.getVar(ime2);
+		      if ( var1 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime1 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var1.last_def = parser.getLine();
+                      if ( var2 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime2 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var2.last_def = parser.getLine();
+
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje kljucna rec 'do'.");
+                    parser.errNo++;
+                    :}
+              | READ LEFTPAR ID:ime1 IN ID:ime2 error
+                    {:
+                       Variable var1 = parser.symbolTable.getVar(ime1);
+                       Variable var2 = parser.symbolTable.getVar(ime2);
+		      if ( var1 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime1 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var1.last_def = parser.getLine();
+                      if ( var2 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime2 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var2.last_def = parser.getLine();
+
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ) .");
+                    parser.errNo++;
+                    :}
+               | READ LEFTPAR ID:ime1 IN error
+                    {:
+                      Variable var1 = parser.symbolTable.getVar(ime1);
+		      if ( var1 == null )
+		      {
+		      	System.out.println( "Greska u liniji " + parser.getLine() +
+		      		": promenljiva " + ime1 + " nije deklarisana.");
+		      	parser.errNo++;
+		      }
+		      else
+		         var1.last_def = parser.getLine();
+
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ID .");
+                    parser.errNo++;
+                    :}
+               | READ LEFTPAR ID error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje kljucna rec 'in' .");
+                    parser.errNo++;
+                    :}
+                | READ LEFTPAR error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ID .");
+                    parser.errNo++;
+                    :}
+                | READ error
+                    {:
+                       System.out.println("Greska u liniji " + parser.getLine() + ": " +
+                            "Nedostaje ( .");
+                    parser.errNo++;
+                    :};
