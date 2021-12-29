@@ -1,8 +1,8 @@
 program
 begin
-i:integer;
+i:char;
 f:file;
-i = 5;
-read (i in f) do i+i
+i = 's';
+read (i in f) do begin k:integer; k=5 end
 end
 return
